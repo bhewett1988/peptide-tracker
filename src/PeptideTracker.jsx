@@ -58,11 +58,7 @@ async function saveKey(key, value) {
 }
 
 /* ── seed data ── */
-const SEED_STACK = [
-  { id:"p1", name:"BPC-157",    dose:"250", unit:"mcg", concentration:"2.5",  freq:"Daily",        time:"08:00" },
-  { id:"p2", name:"TB-500",     dose:"2.5", unit:"mg",  concentration:"5",    freq:"Twice weekly", time:"08:00" },
-  { id:"p3", name:"Sermorelin", dose:"200", unit:"mcg", concentration:"1",    freq:"Daily",        time:"22:00" },
-];
+const SEED_STACK = [];
 
 /* ═══════════════════════════════════════════
    SMALL UI ATOMS
@@ -374,10 +370,10 @@ function PeptideRow({ peptide: p, taken, onToggle, readOnly }) {
 /* ═══════════════════════════════════════════
    STACK TAB
 ═══════════════════════════════════════════ */
-const FREQ_OPTS = ["Daily","Twice daily","Every other day","Weekly","As needed"];
+const FREQ_OPTS = ["Daily","Twice daily","Once weekly","Twice weekly","Every other day","Every N days","As needed"];
 
 function StackTab({ stack, setStack, prefill, clearPrefill }) {
-  const blank = { name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00" };
+  const blank = { name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", startDate:dStr(), intervalDays:"4" };
   const [form, setForm] = useState(blank);
   const [note, setNote] = useState(false);
 
@@ -433,8 +429,20 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
           </div>
           <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
             <Field label="TIME"><input style={inputStyle} type="time" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></Field>
-            <div/>
+            <Field label="START DATE">
+              <div style={{overflow:"hidden",borderRadius:10}}>
+                <input style={{...inputStyle,width:"100%"}} type="date" value={form.startDate} onChange={e=>setForm({...form,startDate:e.target.value})}/>
+              </div>
+            </Field>
           </div>
+          {form.freq==="Every N days" && (
+            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+              <Field label="EVERY HOW MANY DAYS?">
+                <input style={inputStyle} type="number" inputMode="numeric" min="1" placeholder="e.g. 4" value={form.intervalDays} onChange={e=>setForm({...form,intervalDays:e.target.value})}/>
+              </Field>
+              <div/>
+            </div>
+          )}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginTop:4}}>
             <span style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:prevUnits!=null?C.blue:C.dimText}}>
               {prevUnits!=null ? `→ ${prevUnits} units on a 1 mL syringe` : "Add mg/mcg dose + concentration to see draw units"}

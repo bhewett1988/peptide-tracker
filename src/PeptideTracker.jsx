@@ -202,6 +202,31 @@ function labelForDate(ds) {
   return new Date(y,m-1,d).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
 }
 
+/* ── is a peptide due on a given date string? ── */
+function isDueToday(p, dateStr) {
+  const [y,m,d] = dateStr.split("-").map(Number);
+  const jsDay = new Date(y,m-1,d).getDay(); // 0=Sun,1=Mon...
+
+  if (p.freq==="Daily" || p.freq==="Twice daily" || p.freq==="Every other day") return true;
+  if (p.freq==="As needed") return false;
+
+  if (p.freq==="Once weekly" || p.freq==="Twice weekly") {
+    return (p.days||[]).includes(jsDay);
+  }
+
+  if (p.freq==="Every N days") {
+    const n = parseInt(p.intervalDays)||1;
+    const sy = parseInt(p.startYear)||y;
+    const sm = parseInt(p.startMonth)||m;
+    const sd = parseInt(p.startDay)||d;
+    const start = Date.UTC(sy,sm-1,sd);
+    const target = Date.UTC(y,m-1,d);
+    const diff = Math.round((target-start)/86400000);
+    return diff>=0 && diff%n===0;
+  }
+  return true;
+}
+
 /* ═══════════════════════════════════════════
    DASHBOARD
 ═══════════════════════════════════════════ */
@@ -209,7 +234,7 @@ function Dashboard({ stack, daily, sideEffects, patchDaily, onNav }) {
   const [viewDate, setViewDate] = useState(today);
   const isToday   = viewDate === today;
   const taken_map = daily[viewDate]?.peptides || {};
-  const scheduled = stack.filter(p => p.freq !== "As needed");
+  const scheduled = stack.filter(p => isDueToday(p, viewDate));
   const takenCount= scheduled.filter(p => taken_map[p.id]).length;
   const total     = scheduled.length;
   const recentFx  = sideEffects.slice(0,2);
@@ -373,7 +398,7 @@ function PeptideRow({ peptide: p, taken, onToggle, readOnly }) {
 const FREQ_OPTS = ["Daily","Twice daily","Once weekly","Twice weekly","Every other day","Every N days","As needed"];
 
 function StackTab({ stack, setStack, prefill, clearPrefill }) {
-  const blank = { name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", startDate:dStr(), intervalDays:"4" };
+  const blank = { name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", days:[], intervalDays:"4", startDay:"1", startMonth:String(new Date().getMonth()+1), startYear:String(new Date().getFullYear()) };
   const [form, setForm] = useState(blank);
   const [note, setNote] = useState(false);
 
@@ -429,19 +454,60 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
           </div>
           <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
             <Field label="TIME"><input style={inputStyle} type="time" value={form.time} onChange={e=>setForm({...form,time:e.target.value})}/></Field>
-            <Field label="START DATE">
-              <div style={{overflow:"hidden",borderRadius:10}}>
-                <input style={{...inputStyle,width:"100%"}} type="date" value={form.startDate} onChange={e=>setForm({...form,startDate:e.target.value})}/>
+            <div/>
+          </div>
+
+          {/* ── Once/Twice weekly: day picker ── */}
+          {(form.freq==="Once weekly"||form.freq==="Twice weekly") && (
+            <Field label={form.freq==="Once weekly" ? "WHICH DAY?" : "WHICH DAYS? (pick 2)"}>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:2}}>
+                {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d,i)=>{
+                  const idx = i===6?0:i+1;
+                  const active = (form.days||[]).includes(idx);
+                  const atLimit = form.freq==="Once weekly" && (form.days||[]).length>=1 && !active;
+                  const atLimit2 = form.freq==="Twice weekly" && (form.days||[]).length>=2 && !active;
+                  return (
+                    <button key={d} type="button" onClick={()=>{
+                      if(atLimit||atLimit2) return;
+                      const cur=form.days||[];
+                      setForm({...form,days:active?cur.filter(x=>x!==idx):[...cur,idx]});
+                    }} style={{
+                      padding:"7px 12px",borderRadius:8,cursor:(atLimit||atLimit2)?"default":"pointer",
+                      fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:500,
+                      border:`1px solid ${active?C.blue:C.border}`,
+                      background:active?C.blue:C.surface,
+                      color:active?C.bg:(atLimit||atLimit2)?C.dimText:C.white,
+                      opacity:(atLimit||atLimit2)?0.4:1,
+                      transition:"all .12s"
+                    }}>{d}</button>
+                  );
+                })}
               </div>
             </Field>
-          </div>
+          )}
+
+          {/* ── Every N days: interval + start date via dropdowns ── */}
           {form.freq==="Every N days" && (
-            <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+            <>
               <Field label="EVERY HOW MANY DAYS?">
                 <input style={inputStyle} type="number" inputMode="numeric" min="1" placeholder="e.g. 4" value={form.intervalDays} onChange={e=>setForm({...form,intervalDays:e.target.value})}/>
               </Field>
-              <div/>
-            </div>
+              <Field label="STARTING FROM">
+                <div style={{display:"flex",gap:8}}>
+                  <select style={{...inputStyle,flex:1}} value={form.startDay} onChange={e=>setForm({...form,startDay:e.target.value})}>
+                    {Array.from({length:31},(_,i)=><option key={i+1} value={String(i+1)}>{i+1}</option>)}
+                  </select>
+                  <select style={{...inputStyle,flex:2}} value={form.startMonth} onChange={e=>setForm({...form,startMonth:e.target.value})}>
+                    {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m,i)=>(
+                      <option key={i} value={String(i+1)}>{m}</option>
+                    ))}
+                  </select>
+                  <select style={{...inputStyle,flex:1}} value={form.startYear} onChange={e=>setForm({...form,startYear:e.target.value})}>
+                    {[2024,2025,2026,2027].map(y=><option key={y} value={String(y)}>{y}</option>)}
+                  </select>
+                </div>
+              </Field>
+            </>
           )}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginTop:4}}>
             <span style={{fontSize:12,fontFamily:"'DM Mono',monospace",color:prevUnits!=null?C.blue:C.dimText}}>

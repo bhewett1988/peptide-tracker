@@ -398,7 +398,8 @@ function PeptideRow({ peptide: p, taken, onToggle, readOnly }) {
 const FREQ_OPTS = ["Daily","Twice daily","Once weekly","Twice weekly","Every other day","Every N days","As needed"];
 
 function StackTab({ stack, setStack, prefill, clearPrefill }) {
-  const blank = { name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", days:[], intervalDays:"4", startDay:"1", startMonth:String(new Date().getMonth()+1), startYear:String(new Date().getFullYear()) };
+  const makeBlank = () => ({ name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", days:[], intervalDays:"4", startDay:"1", startMonth:String(new Date().getMonth()+1), startYear:String(new Date().getFullYear()) });
+  const blank = makeBlank();
   const [form, setForm] = useState(blank);
   const [note, setNote] = useState(false);
 
@@ -409,7 +410,7 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
   const add = () => {
     if (!form.name.trim()) return;
     setStack(prev=>[...prev,{id:uid(),...form,name:form.name.trim()}]);
-    setForm(blank); setNote(false); clearPrefill();
+    setForm(makeBlank()); setNote(false); clearPrefill();
   };
   const remove = (id) => setStack(prev=>prev.filter(p=>p.id!==id));
 
@@ -459,31 +460,39 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
 
           {/* ── Once/Twice weekly: day picker ── */}
           {(form.freq==="Once weekly"||form.freq==="Twice weekly") && (
-            <Field label={form.freq==="Once weekly" ? "WHICH DAY?" : "WHICH DAYS? (pick 2)"}>
-              <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:2}}>
+            <div style={{marginBottom:12}}>
+              <span style={{display:"block",fontSize:10.5,fontFamily:"'DM Mono',monospace",fontWeight:500,color:C.muted,marginBottom:8,letterSpacing:".08em"}}>
+                {form.freq==="Once weekly" ? "WHICH DAY?" : "WHICH DAYS?"}
+              </span>
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((d,i)=>{
                   const idx = i===6?0:i+1;
                   const active = (form.days||[]).includes(idx);
-                  const atLimit = form.freq==="Once weekly" && (form.days||[]).length>=1 && !active;
-                  const atLimit2 = form.freq==="Twice weekly" && (form.days||[]).length>=2 && !active;
                   return (
-                    <button key={d} type="button" onClick={()=>{
-                      if(atLimit||atLimit2) return;
-                      const cur=form.days||[];
-                      setForm({...form,days:active?cur.filter(x=>x!==idx):[...cur,idx]});
-                    }} style={{
-                      padding:"7px 12px",borderRadius:8,cursor:(atLimit||atLimit2)?"default":"pointer",
-                      fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:500,
-                      border:`1px solid ${active?C.blue:C.border}`,
-                      background:active?C.blue:C.surface,
-                      color:active?C.bg:(atLimit||atLimit2)?C.dimText:C.white,
-                      opacity:(atLimit||atLimit2)?0.4:1,
-                      transition:"all .12s"
+                    <button key={d} type="button"
+                      onClick={(e)=>{
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const cur = form.days||[];
+                        if(active){
+                          setForm(f=>({...f,days:cur.filter(x=>x!==idx)}));
+                        } else {
+                          if(form.freq==="Once weekly") setForm(f=>({...f,days:[idx]}));
+                          else setForm(f=>({...f,days:[...cur,idx]}));
+                        }
+                      }}
+                      style={{
+                        padding:"8px 13px",borderRadius:8,cursor:"pointer",
+                        fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:500,
+                        border:`1px solid ${active?C.blue:C.border}`,
+                        background:active?C.blue:C.surface,
+                        color:active?C.bg:C.white,
+                        transition:"all .12s"
                     }}>{d}</button>
                   );
                 })}
               </div>
-            </Field>
+            </div>
           )}
 
           {/* ── Every N days: interval + start date via dropdowns ── */}

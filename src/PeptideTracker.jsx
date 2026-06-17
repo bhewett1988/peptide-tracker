@@ -942,16 +942,8 @@ export default function App() {
           <div style={{ display:"flex", alignItems:"center", gap:10 }}>
             <div style={{ width:32, height:32, borderRadius:"50%",
               background:C.surface, border:`1px solid ${C.borderBright}`,
-              display:"grid", placeItems:"center" }}>
-              <svg width={16} height={16} viewBox="0 0 20 20" fill="none">
-                <circle cx={5} cy={14} r={2.5} fill={C.blue}/>
-                <circle cx={10} cy={8} r={2} fill={C.teal}/>
-                <circle cx={16} cy={5} r={1.5} fill={C.blue} opacity={.7}/>
-                <circle cx={15} cy={12} r={1.5} fill={C.teal} opacity={.6}/>
-                <line x1={5} y1={14} x2={10} y2={8}  stroke={C.blue} strokeWidth={1.2}/>
-                <line x1={10} y1={8} x2={16} y2={5}  stroke={C.teal} strokeWidth={1}/>
-                <line x1={10} y1={8} x2={15} y2={12} stroke={C.blue} strokeWidth={1}/>
-              </svg>
+              display:"grid", placeItems:"center", overflow:"hidden" }}>
+              <img src="/logo-mark.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
             </div>
             <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:18,
               letterSpacing:"-.01em" }}>

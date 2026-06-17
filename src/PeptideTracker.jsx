@@ -399,8 +399,16 @@ function PeptideRow({ peptide: p, taken, onToggle, readOnly }) {
 ═══════════════════════════════════════════ */
 const FREQ_OPTS = ["Daily","Twice daily","Once weekly","Twice weekly","Every other day","Every N days","As needed"];
 
+const PEPTIDE_OPTS = [
+  "TRZ","RETA","TESA","SEMA",
+  "BPC157","TB500","CJC/IPA","IPA",
+  "MOTSC","SEMAX","SELANK","NAD+",
+  "GHKCU","AHKCU","GLOW","KLOW","MT1","MT2",
+  "Other",
+];
+
 function StackTab({ stack, setStack, prefill, clearPrefill }) {
-  const makeBlank = () => ({ name:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", days:[], intervalDays:"4", startDay:"1", startMonth:String(new Date().getMonth()+1), startYear:String(new Date().getFullYear()) });
+  const makeBlank = () => ({ name:"", customName:"", dose:"", unit:"mcg", concentration:"", freq:"Daily", time:"08:00", days:[], intervalDays:"4", startDay:"1", startMonth:String(new Date().getMonth()+1), startYear:String(new Date().getFullYear()) });
   const blank = makeBlank();
   const [form, setForm] = useState(blank);
   const [note, setNote] = useState(false);
@@ -409,9 +417,11 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
     if (prefill) { setForm(f=>({...f,...prefill})); setNote(true); }
   }, [prefill]);
 
+  const finalName = form.name === "Other" ? form.customName.trim() : form.name;
+
   const add = () => {
-    if (!form.name.trim()) return;
-    setStack(prev=>[...prev,{id:uid(),...form,name:form.name.trim()}]);
+    if (!finalName) return;
+    setStack(prev=>[...prev,{id:uid(),...form,name:finalName}]);
     setForm(makeBlank()); setNote(false); clearPrefill();
   };
   const remove = (id) => setStack(prev=>prev.filter(p=>p.id!==id));
@@ -439,7 +449,12 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
             </div>
           )}
           <div style={{display:"grid", gridTemplateColumns:"2fr 1fr 1fr", gap:10}}>
-            <Field label="NAME"><input style={inputStyle} placeholder="e.g. BPC-157" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field>
+            <Field label="NAME">
+              <select style={inputStyle} value={form.name} onChange={e=>setForm({...form,name:e.target.value})}>
+                <option value="">— Select —</option>
+                {PEPTIDE_OPTS.map(n=><option key={n} value={n}>{n}</option>)}
+              </select>
+            </Field>
             <Field label="DOSE"><input style={inputStyle} type="number" placeholder="e.g. 250" value={form.dose} onChange={e=>setForm({...form,dose:e.target.value})}/></Field>
             <Field label="UNIT">
               <select style={inputStyle} value={form.unit} onChange={e=>setForm({...form,unit:e.target.value})}>
@@ -447,6 +462,11 @@ function StackTab({ stack, setStack, prefill, clearPrefill }) {
               </select>
             </Field>
           </div>
+          {form.name==="Other" && (
+            <Field label="CUSTOM NAME">
+              <input style={inputStyle} placeholder="e.g. supplier's product name" value={form.customName} onChange={e=>setForm({...form,customName:e.target.value})}/>
+            </Field>
+          )}
           <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
             <Field label="CONCENTRATION (mg/mL)"><input style={inputStyle} type="number" step=".1" placeholder="e.g. 2.5" value={form.concentration} onChange={e=>setForm({...form,concentration:e.target.value})}/></Field>
             <Field label="FREQUENCY">

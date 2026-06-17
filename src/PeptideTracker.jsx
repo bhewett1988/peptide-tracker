@@ -341,6 +341,21 @@ function Dashboard({ stack, daily, sideEffects, patchDaily, onNav }) {
           </div>
         </Card>
       )}
+
+      {/* ── order button ── */}
+      <a href="https://uniqresearch.co.uk" target="_blank" rel="noopener noreferrer"
+        style={{
+          display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+          padding:"15px 20px", borderRadius:14, textDecoration:"none",
+          background:C.blue, color:C.bg,
+          fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:14.5,
+          letterSpacing:".02em", boxShadow:`0 0 20px ${C.blue}30`,
+        }}>
+        ORDER FROM UNIQ RESEARCH
+        <svg width={15} height={15} viewBox="0 0 15 15" fill="none">
+          <path d="M3 11.5L11.5 3M11.5 3H5M11.5 3V9" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </a>
     </div>
   );
 }

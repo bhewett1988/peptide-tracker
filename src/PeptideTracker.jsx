@@ -47,14 +47,16 @@ const fmtTime = (hm) => {
 const today = dStr();
 const todayLabel = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase();
 
-/* ── storage ── */
+/* ── storage (real browser localStorage — persists on device) ── */
 const KEYS = { stack:"pt:stack", sideEffects:"pt:fx", daily:"pt:daily" };
 async function loadKey(key, fallback) {
-  try { const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : fallback; }
-  catch { return fallback; }
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch { return fallback; }
 }
 async function saveKey(key, value) {
-  try { await window.storage.set(key, JSON.stringify(value), false); } catch {}
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage full or blocked */ }
 }
 
 /* ── seed data ── */
@@ -898,7 +900,7 @@ export default function App() {
       <style>{FONTS}</style>
       <style>{`*{box-sizing:border-box;}body{margin:0;}input,select,textarea{max-width:100%;}input[type='date']{-webkit-appearance:none;appearance:none;}`}</style>
 
-      <div style={{ maxWidth:720, margin:"0 auto", padding:"24px 18px 80px" }}>
+      <div style={{ maxWidth:720, margin:"0 auto", padding:"env(safe-area-inset-top, 24px) 18px 80px" }}>
 
         {/* header */}
         <header style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:24 }}>

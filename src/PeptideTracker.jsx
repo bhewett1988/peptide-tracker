@@ -47,16 +47,62 @@ const fmtTime = (hm) => {
 const today = dStr();
 const todayLabel = new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"}).toUpperCase();
 
-/* ── storage (real browser localStorage — persists on device) ── */
-const KEYS = { stack:"pt:stack", sideEffects:"pt:fx", daily:"pt:daily" };
-async function loadKey(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch { return fallback; }
+/* ── Supabase ── */
+import { supabase } from "./supabaseClient.js";
+
+/* ── data shape adapters ──
+   DB rows use snake_case (concentration, interval_days, start_day...).
+   The rest of this app's components expect the original camelCase
+   shape used since the localStorage version. These convert between. */
+function dbStackToApp(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    dose: row.dose,
+    unit: row.unit,
+    concentration: row.concentration,
+    freq: row.freq,
+    time: row.time,
+    days: row.days || [],
+    intervalDays: row.interval_days,
+    startDay: row.start_day,
+    startMonth: row.start_month,
+    startYear: row.start_year,
+  };
 }
-async function saveKey(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* storage full or blocked */ }
+function appStackToDb(p, userId) {
+  return {
+    user_id: userId,
+    name: p.name,
+    dose: p.dose,
+    unit: p.unit,
+    concentration: p.concentration,
+    freq: p.freq,
+    time: p.time,
+    days: p.days || [],
+    interval_days: p.intervalDays,
+    start_day: p.startDay,
+    start_month: p.startMonth,
+    start_year: p.startYear,
+  };
+}
+function dbFxToApp(row) {
+  return {
+    id: row.id,
+    date: row.log_date,
+    desc: row.description,
+    severity: row.severity,
+    related: row.related_to || "",
+  };
+}
+function appFxToDb(fx, userId) {
+  return {
+    user_id: userId,
+    log_date: fx.date,
+    description: fx.desc,
+    severity: fx.severity,
+    related_to: fx.related || null,
+  };
 }
 
 /* ── seed data ── */
@@ -898,9 +944,96 @@ function SideEffectsTab({ sideEffects, setSideEffects, stack }) {
 }
 
 /* ═══════════════════════════════════════════
+   AUTH SCREEN
+═══════════════════════════════════════════ */
+function AuthScreen({ onAuthed }) {
+  const [mode, setMode] = useState("signin"); // signin | signup
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState("");
+
+  const submit = async () => {
+    setErr(""); setInfo("");
+    if (!email.trim() || !password) { setErr("Enter your email and password."); return; }
+    setBusy(true);
+    try {
+      if (mode === "signup") {
+        const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+        if (error) throw error;
+        if (data.session) { onAuthed(); }
+        else setInfo("Check your email to confirm your account, then sign in.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error;
+        onAuthed();
+      }
+    } catch (e) {
+      setErr(e.message || "Something went wrong.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", background:C.bg, color:C.white,
+      fontFamily:"'Inter',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <style>{FONTS}</style>
+      <style>{`*{box-sizing:border-box;}body{margin:0;}input{max-width:100%;}`}</style>
+      <div style={{ width:"100%", maxWidth:380 }}>
+
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", marginBottom:28 }}>
+          <div style={{ width:56, height:56, borderRadius:"50%",
+            background:C.surface, border:`1px solid ${C.borderBright}`,
+            display:"grid", placeItems:"center", overflow:"hidden", marginBottom:14 }}>
+            <img src="/logo-mark.png" alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
+          </div>
+          <span style={{ fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:20, letterSpacing:"-.01em" }}>
+            PEPTIDE<span style={{color:C.blue}}>TRACKER</span>
+          </span>
+        </div>
+
+        <Card style={{ padding:24 }}>
+          <div style={{ display:"flex", gap:4, background:C.surface, border:`1px solid ${C.border}`,
+            borderRadius:12, padding:4, marginBottom:20 }}>
+            {[{id:"signin",l:"Sign In"},{id:"signup",l:"Sign Up"}].map(m=>{
+              const on = mode===m.id;
+              return <button key={m.id} onClick={()=>{setMode(m.id);setErr("");setInfo("");}} style={{
+                flex:1, padding:"9px", borderRadius:9, border:"none", cursor:"pointer",
+                fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:13,
+                background:on?C.blue:"transparent", color:on?C.bg:C.muted, transition:"all .15s",
+              }}>{m.l}</button>;
+            })}
+          </div>
+
+          <Field label="EMAIL">
+            <input style={inputStyle} type="email" autoComplete="email" placeholder="you@example.com"
+              value={email} onChange={e=>setEmail(e.target.value)}/>
+          </Field>
+          <Field label="PASSWORD">
+            <input style={inputStyle} type="password" autoComplete={mode==="signup"?"new-password":"current-password"}
+              placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)}
+              onKeyDown={e=>{ if(e.key==="Enter") submit(); }}/>
+          </Field>
+
+          {err && <p style={{color:C.danger,fontSize:12.5,fontFamily:"'DM Mono',monospace",margin:"4px 0 12px"}}>{err}</p>}
+          {info && <p style={{color:C.success,fontSize:12.5,fontFamily:"'DM Mono',monospace",margin:"4px 0 12px"}}>{info}</p>}
+
+          <Btn onClick={submit} style={{ width:"100%", justifyContent:"center", marginTop:4, opacity:busy?0.6:1 }}>
+            {busy ? "···" : mode==="signup" ? "CREATE ACCOUNT" : "SIGN IN"}
+          </Btn>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
    APP SHELL
 ═══════════════════════════════════════════ */
 export default function App() {
+  const [session, setSession]   = useState(undefined); // undefined = checking, null = signed out
   const [tab, setTab]           = useState("dashboard");
   const [loading, setLoading]   = useState(true);
   const [stack, setStackRaw]    = useState([]);
@@ -908,26 +1041,133 @@ export default function App() {
   const [daily, setDailyRaw]    = useState({});
   const [calcPrefill, setCalcPrefill] = useState(null);
 
-  useEffect(()=>{
-    (async()=>{
-      const [s,fx,d] = await Promise.all([
-        loadKey(KEYS.stack, null),
-        loadKey(KEYS.sideEffects, null),
-        loadKey(KEYS.daily, null),
+  /* ── auth lifecycle ── */
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
+      setSession(sess);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  /* ── load all data once authed ── */
+  useEffect(() => {
+    if (!session) return;
+    setLoading(true);
+    (async () => {
+      const userId = session.user.id;
+
+      const [{ data: stackRows }, { data: fxRows }, { data: logRows }] = await Promise.all([
+        supabase.from("stack").select("*").order("created_at", { ascending: true }),
+        supabase.from("side_effects").select("*").order("log_date", { ascending: false }),
+        supabase.from("daily_logs").select("*"),
       ]);
-      setStackRaw(s||SEED_STACK);
-      setSERaw(fx||[]);
-      setDailyRaw(d||{});
+
+      setStackRaw((stackRows || []).map(dbStackToApp));
+      setSERaw((fxRows || []).map(dbFxToApp));
+
+      // daily_logs rows → { "2026-06-18": { peptides: { [peptideId]: true } } }
+      const dailyMap = {};
+      (logRows || []).forEach(r => {
+        const ds = r.log_date;
+        if (!dailyMap[ds]) dailyMap[ds] = { peptides: {} };
+        dailyMap[ds].peptides[r.peptide_id] = !!r.taken;
+      });
+      setDailyRaw(dailyMap);
+
       setLoading(false);
     })();
-  },[]);
+  }, [session]);
 
-  const setStack       = up=>{ const n=typeof up==="function"?up(stack):up; setStackRaw(n); saveKey(KEYS.stack,n); };
-  const setSideEffects = up=>{ const n=typeof up==="function"?up(sideEffects):up; setSERaw(n); saveKey(KEYS.sideEffects,n); };
-  const patchDaily     = patch=>setDailyRaw(prev=>{ const n={...prev,[today]:{...(prev[today]||{}),...patch}}; saveKey(KEYS.daily,n); return n; });
+  /* ── stack: insert/delete against Supabase, keep local state in sync ── */
+  const setStack = async (updater) => {
+    const userId = session.user.id;
+    const prevList = stack;
+    const nextList = typeof updater === "function" ? updater(prevList) : updater;
+
+    // Added: items in next not in prev (no id match)
+    const prevIds = new Set(prevList.map(p => p.id));
+    const added = nextList.filter(p => !prevIds.has(p.id));
+    // Removed: items in prev not in next
+    const nextIds = new Set(nextList.map(p => p.id));
+    const removed = prevList.filter(p => !nextIds.has(p.id));
+
+    setStackRaw(nextList); // optimistic UI update
+
+    for (const p of removed) {
+      await supabase.from("stack").delete().eq("id", p.id);
+    }
+    for (const p of added) {
+      const { data, error } = await supabase.from("stack")
+        .insert(appStackToDb(p, userId)).select().single();
+      if (!error && data) {
+        // swap the temporary local id for the real DB id
+        setStackRaw(curr => curr.map(item => item.id === p.id ? dbStackToApp(data) : item));
+      }
+    }
+  };
+
+  /* ── side effects: insert/delete against Supabase ── */
+  const setSideEffects = async (updater) => {
+    const userId = session.user.id;
+    const prevList = sideEffects;
+    const nextList = typeof updater === "function" ? updater(prevList) : updater;
+
+    const prevIds = new Set(prevList.map(f => f.id));
+    const added = nextList.filter(f => !prevIds.has(f.id));
+    const nextIds = new Set(nextList.map(f => f.id));
+    const removed = prevList.filter(f => !nextIds.has(f.id));
+
+    setSERaw(nextList);
+
+    for (const f of removed) {
+      await supabase.from("side_effects").delete().eq("id", f.id);
+    }
+    for (const f of added) {
+      const { data, error } = await supabase.from("side_effects")
+        .insert(appFxToDb(f, userId)).select().single();
+      if (!error && data) {
+        setSERaw(curr => curr.map(item => item.id === f.id ? dbFxToApp(data) : item));
+      }
+    }
+  };
+
+  /* ── daily toggle: upsert a single row ── */
+  const patchDaily = async (patch) => {
+    const userId = session.user.id;
+    if (!patch.peptides) return;
+
+    // patch.peptides is the FULL map for `today` after toggling one id —
+    // diff against current state to find what changed.
+    const prevMap = daily[today]?.peptides || {};
+    const nextMap = patch.peptides;
+
+    setDailyRaw(prev => ({ ...prev, [today]: { ...(prev[today]||{}), peptides: nextMap } }));
+
+    const changedIds = Object.keys(nextMap).filter(id => !!nextMap[id] !== !!prevMap[id]);
+    for (const peptideId of changedIds) {
+      const taken = !!nextMap[peptideId];
+      await supabase.from("daily_logs").upsert({
+        user_id: userId, peptide_id: peptideId, log_date: today, taken,
+      }, { onConflict: "user_id,peptide_id,log_date" });
+    }
+  };
 
   const handleUseInStack = (prefill) => { setCalcPrefill(prefill); setTab("stack"); };
   const clearPrefill     = () => setCalcPrefill(null);
+  const signOut           = () => supabase.auth.signOut();
+
+  if (session === undefined) {
+    return (
+      <div style={{ minHeight:"100vh", background:C.bg, display:"grid", placeItems:"center" }}>
+        <span style={{ color:C.muted, fontFamily:"'DM Mono',monospace", fontSize:13 }}>Loading…</span>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthScreen onAuthed={()=>{}}/>;
+  }
 
   return (
     <div style={{ minHeight:"100vh", background:C.bg, color:C.white,
@@ -950,7 +1190,9 @@ export default function App() {
               PEPTIDE<span style={{color:C.blue}}>TRACKER</span>
             </span>
           </div>
-          <div/>
+          <button onClick={signOut} style={{ background:"none", border:`1px solid ${C.border}`,
+            borderRadius:8, padding:"6px 12px", cursor:"pointer", color:C.muted,
+            fontFamily:"'DM Mono',monospace", fontSize:11 }}>SIGN OUT</button>
         </header>
 
         <TabBar active={tab} onChange={setTab}/>

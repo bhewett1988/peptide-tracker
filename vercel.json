@@ -2,11 +2,6 @@
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/" }
   ],
-  "functions": {
-    "api/send-reminders.js": {
-      "runtime": "@vercel/node@3.0.0"
-    }
-  },
   "crons": [
     {
       "path": "/api/send-reminders",

@@ -402,6 +402,43 @@ function Dashboard({ stack, daily, sideEffects, patchDaily, onNav }) {
           <path d="M3 11.5L11.5 3M11.5 3H5M11.5 3V9" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </a>
+
+      {/* ── test reminder button (dev/testing only) ── */}
+      <TestReminderButton/>
+    </div>
+  );
+}
+
+function TestReminderButton() {
+  const [status, setStatus] = useState("idle"); // idle | sending | done | error
+  const [resultMsg, setResultMsg] = useState("");
+
+  const send = async () => {
+    setStatus("sending"); setResultMsg("");
+    try {
+      const res = await fetch("/api/send-reminders");
+      const json = await res.json();
+      if (json.ok) {
+        const me = json.results?.[0];
+        setStatus("done");
+        setResultMsg(me?.sent ? `Sent — due: ${me.due.join(", ")}` : (me?.reason || "Checked — nothing due today"));
+      } else {
+        setStatus("error"); setResultMsg(json.error || "Failed");
+      }
+    } catch (e) {
+      setStatus("error"); setResultMsg(e.message);
+    }
+  };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+      <Btn kind="ghost" onClick={send} style={{ width:"100%", justifyContent:"center" }}>
+        {status==="sending" ? "SENDING…" : "SEND TEST REMINDER"}
+      </Btn>
+      {resultMsg && (
+        <p style={{ fontSize:11.5, fontFamily:"'DM Mono',monospace", color: status==="error"?C.danger:C.muted,
+          textAlign:"center", margin:0 }}>{resultMsg}</p>
+      )}
     </div>
   );
 }

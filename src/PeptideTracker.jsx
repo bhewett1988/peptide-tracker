@@ -388,60 +388,12 @@ function Dashboard({ stack, daily, sideEffects, patchDaily, onNav }) {
         </Card>
       )}
 
-      {/* ── order button ── */}
-      <a href="https://uniqresearch.co.uk" target="_blank" rel="noopener noreferrer"
-        style={{
-          display:"flex", alignItems:"center", justifyContent:"center", gap:8,
-          padding:"15px 20px", borderRadius:14, textDecoration:"none",
-          background:C.blue, color:C.bg,
-          fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:14.5,
-          letterSpacing:".02em", boxShadow:`0 0 20px ${C.blue}30`,
-        }}>
-        ORDER FROM UNIQ RESEARCH
-        <svg width={15} height={15} viewBox="0 0 15 15" fill="none">
-          <path d="M3 11.5L11.5 3M11.5 3H5M11.5 3V9" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </a>
 
-      {/* ── test reminder button (dev/testing only) ── */}
-      <TestReminderButton/>
+
     </div>
   );
 }
 
-function TestReminderButton() {
-  const [status, setStatus] = useState("idle"); // idle | sending | done | error
-  const [resultMsg, setResultMsg] = useState("");
-
-  const send = async () => {
-    setStatus("sending"); setResultMsg("");
-    try {
-      const res = await fetch("/api/send-reminders");
-      const json = await res.json();
-      if (json.ok) {
-        const me = json.results?.[0];
-        setStatus("done");
-        setResultMsg(me?.sent ? `Sent — due: ${me.due.join(", ")}` : (me?.reason || "Checked — nothing due today"));
-      } else {
-        setStatus("error"); setResultMsg(json.error || "Failed");
-      }
-    } catch (e) {
-      setStatus("error"); setResultMsg(e.message);
-    }
-  };
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-      <Btn kind="ghost" onClick={send} style={{ width:"100%", justifyContent:"center" }}>
-        {status==="sending" ? "SENDING…" : "SEND TEST REMINDER"}
-      </Btn>
-      {resultMsg && (
-        <p style={{ fontSize:11.5, fontFamily:"'DM Mono',monospace", color: status==="error"?C.danger:C.muted,
-          textAlign:"center", margin:0 }}>{resultMsg}</p>
-      )}
-    </div>
-  );
-}
 
 function StatCard({ label, value, sub, accent, onClick }) {
   return (
